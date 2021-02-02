@@ -1,4 +1,4 @@
-from camera.video_stream import VideoStream
+from utils.camera.video_stream import VideoStream
 import cv2
 
 CAMERA_NUM = 0
