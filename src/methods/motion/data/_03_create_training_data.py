@@ -65,7 +65,7 @@ if __name__ == '__main__':
         save_signal.append(normed_ys)
         save_label.append(label)
 
-    np_xs = np.array(save_xs) / 255.0
+    np_xs = np.array(save_xs).astype(np.uint8)
     np_signal = np.array(save_signal)
     np_label = np.array(save_label)
 

@@ -1,13 +1,14 @@
+import numpy as np
 import matplotlib.pyplot as plt
 
 from keras.optimizers import *
 from keras.callbacks import *
 from keras import backend as K
 
-from utils.path import data_path, result_path
+from path import data_path, model_path
 
-from motion.model._01_data_generator import Generator
-from motion.model._02_models import model_classification
+from methods.motion.model._01_data_generator import Generator
+from methods.motion.model._02_models import model_classification
 
 
 def lr_schedule(epoch):
@@ -49,16 +50,14 @@ def train_model(model, generator, epochs=500, save_path='model.h5'):
 
 if __name__ == '__main__':
     # Load model
-    model = model_classification(channels=3, window_size=64, output_channels=1)
+    model = model_classification(channels=3, window_size=64, output_channels=1, fcn=False)
 
     # Set generator
-    xs = np.load(data_path('train_data/xs.npy'))
-    ys = np.load(data_path('train_data/label.npy'))
-
     data_type = 0b000001  # DATA_CLASSIFICATION, DATA_SIGNAL_RESTORE
     y_type = 0b000000  # Y_NOISE_LENGTH, Y_BPM
     augment_type = 0b000001  # AUGMENTATION_COLOR, AUGMENTATION_NOISE
-    generator = Generator(xs, ys, y_threshold=0.7, batch_size=10, data_type=data_type, y_type=y_type, augment_type=augment_type)
+    path = data_path('train/data.h5')
+    generator = Generator(path, y_threshold=0.7, batch_size=10, data_type=data_type, y_type=y_type, augment_type=augment_type)
 
     # Train model
-    train_model(model, generator, epochs=500, save_path=result_path('detect_roi/model_fc.h5'))
+    train_model(model, generator, epochs=10, save_path=model_path('detect_roi/model.h5'))

@@ -1,10 +1,11 @@
 import numpy as np
 import cv2
+import h5py
 
 from keras.utils import Sequence
 
-from utils.path import data_path
-from utils.visualize import show_signal
+from path import data_path
+from utils.visualization.signal import show_signal
 
 
 class Generator(Sequence):
@@ -17,13 +18,11 @@ class Generator(Sequence):
     AUGMENTATION_COLOR = 0b000001
     AUGMENTATION_NOISE = 0b000010
 
-    def __init__(self, xs, ys=None, y_threshold=0.6, batch_size=32, data_type=DATA_CLASSIFICATION, y_type=0, augment_type=0):
-        self.xs = xs
-        if len(ys) == 2:
-            self.ys = (ys[0] > y_threshold).astype(np.float32)
-            self.bpms = ys[1]
-        else:
-            self.ys = (ys > y_threshold).astype(np.float32)
+    def __init__(self, path, y_threshold=0.6, batch_size=32, data_type=DATA_CLASSIFICATION, y_type=0, augment_type=0):
+        hf = h5py.File(path, 'r')
+        self.xs = hf.get('xs')
+        self.ys = hf.get('label')
+        self.y_threshold = y_threshold
 
         self.batch_size = batch_size
 
@@ -44,9 +43,10 @@ class Generator(Sequence):
 
     def __getitem__(self, batch_index):
         idx = self.index[batch_index * self.batch_size: (batch_index + 1) * self.batch_size]
-        x = self.xs[idx].copy()
-        y = self.xs[idx].copy() if self.data_type & self.DATA_SIGNAL_RESTORE else self.ys[idx].copy()
-        bpm = self.bpms[idx].copy() if self.y_type & self.Y_BPM else None
+        idx = np.sort(idx)
+        x = self.xs[idx].astype(np.float32) / 255.0
+        y = (self.xs[idx].astype(np.float32) / 255.0) if self.data_type & self.DATA_SIGNAL_RESTORE else (self.ys[idx] >= self.y_threshold).astype(np.float32)
+        bpm = self.bpms[idx] if self.y_type & self.Y_BPM else None
 
         x, y = self.augmentation(x, y, bpm)
         return x, y
@@ -200,15 +200,13 @@ def generator_test(generator):
 
 
 if __name__ == '__main__':
-    ## *********************** Load data ************************ ##
-    xs = np.load(data_path('train_data/xs.npy'))
-    ys = np.load(data_path('train_data/label.npy'))
-
     ## ******************* Set generator type ******************* ##
     data_type = 0b000001    # DATA_CLASSIFICATION, DATA_SIGNAL_RESTORE
     y_type = 0b000001       # Y_NOISE_LENGTH, Y_BPM
     augment_type = 0b000011 # AUGMENTATION_COLOR, AUGMENTATION_NOISE
-    generator = Generator(xs, ys, y_threshold=0.7, batch_size=10, data_type=data_type, y_type=y_type, augment_type=augment_type)
+    path = data_path('train/data.h5')
+
+    generator = Generator(path, y_threshold=0.7, batch_size=10, data_type=data_type, y_type=y_type, augment_type=augment_type)
 
     ## ********************* Test generator ********************* ##
     generator_test(generator)
