@@ -19,6 +19,12 @@ def result_path(name):
     return os.path.join(path, name)
 
 
+def ui_path(name):
+    dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(dir, '../ui')
+    return os.path.join(path, name)
+
+
 def src_path(name):
     dir = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(dir, '../src')
