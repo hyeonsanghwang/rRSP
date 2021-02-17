@@ -60,4 +60,4 @@ if __name__ == '__main__':
     generator = Generator(path, y_threshold=0.7, batch_size=10, data_type=data_type, y_type=y_type, augment_type=augment_type)
 
     # Train model
-    train_model(model, generator, epochs=10, save_path=model_path('detect_roi/model.h5'))
+    train_model(model, generator, epochs=500, save_path=model_path('detect_roi/model.h5'))
