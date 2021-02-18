@@ -1,24 +1,29 @@
 import os
-os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
 import cv2
 import numpy as np
 from time import perf_counter
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QSize, pyqtSlot
-from PyQt5.QtWidgets import QMainWindow, QWidget, QListWidget, QListWidgetItem, QVBoxLayout, QCheckBox, QPushButton, \
-    QTabWidget, QSpinBox, QFileDialog, QMessageBox, QLabel, QProgressBar
-from PyQt5 import uic, QtGui
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from PyQt5 import QtGui
 
-from path import ui_path
-from .processing import ProcessingThread
+from .processing import ProcessManager
 from .window_form import WindowForm
 from utils.visualization.signal import signal_to_frame
 
 
 class MainWindow(WindowForm):
-    def __init__(self):
+    signal_start_process = pyqtSignal(int)
+    signal_stop_process = pyqtSignal()
+    signal_changed_frame = pyqtSignal(np.ndarray)
+    signal_changed_estimated_signal = pyqtSignal(np.ndarray, int)
+    signal_changed_reference_signal = pyqtSignal(np.ndarray, int)
+    signal_changed_fps = pyqtSignal()
+
+    def __init__(self, params):
         super().__init__()
+        self.params = params
 
         # Init parameters
         self.np_video_path = None
@@ -27,12 +32,7 @@ class MainWindow(WindowForm):
         self.time_stamp = []
 
         # Processing thread
-        self.processing_thread = ProcessingThread()
-        self.processing_thread.signal_get_image.connect(self.show_image)
-        self.processing_thread.signal_set_fps.connect(self.set_fps)
-        self.processing_thread.signal_get_estimated_signal.connect(self.show_reference_signal)
-        self.processing_thread.signal_get_reference_signal.connect(self.show_reference_signal)
-        self.processing_thread.signal_end_process.connect(self.stop_processing)
+        self.set_signals()
 
         # Events that require communication with processing thread
         self.b_start.clicked.connect(lambda: self.on_button_event(self.b_start))
@@ -58,82 +58,110 @@ class MainWindow(WindowForm):
         self.cb_reference.clicked.connect(lambda: self.on_click_show_signal(self.cb_reference))
 
         # Set default model path
-        path = '../../../model/detect_roi/model.h5'
+        self.set_model('../../../model/detect_roi/model.h5')
+
+    # Set methods ------------------------------------------------------------------------------------------------------
+    def set_signals(self):
+        self.signal_start_process.connect(self.start_processing)
+        self.signal_stop_process.connect(self.stop_processing)
+        self.signal_changed_frame.connect(self.show_image)
+        self.signal_changed_estimated_signal.connect(self.show_reference_signal)
+        self.signal_changed_reference_signal.connect(self.show_reference_signal)
+        self.signal_changed_fps.connect(self.set_fps)
+
+        self.params.set_signal(self.params.SIGNAL_START_PROCESS, self.signal_start_process)
+        self.params.set_signal(self.params.SIGNAL_STOP_PROCESS, self.signal_stop_process)
+        self.params.set_signal(self.params.SIGNAL_CHANGED_FRAME, self.signal_changed_frame)
+        self.params.set_signal(self.params.SIGNAL_CHANGED_ESTIMATED_SIGNAL, self.signal_changed_estimated_signal)
+        self.params.set_signal(self.params.SIGNAL_CHANGED_REFERENCE_SIGNAL, self.signal_changed_reference_signal)
+        self.params.set_signal(self.params.SIGNAL_CHANGED_FPS, self.signal_changed_fps)
+
+    def set_parameters(self):
+        self.params.fps = self.spin_fps.value()
+        self.params.process_fps = self.spin_process_fps.value()
+        self.params.window_size = self.spin_window_size.value()
+        self.params.resize_ratio = self.spin_resize_ratio.value()
+        self.params.color_domain = self.combo_color_domain.currentIndex()
+        self.params.detect_threshold = self.spin_threshold.value()
+        self.params.is_changed_parameters = True
+
+    def set_source(self):
+        curr_idx = self.tab_src.currentIndex()
+
+        if curr_idx == 0:  # camera
+            self.params.src_type = ProcessManager.INPUT_TYPE_WEBCAM
+            self.params.src_video = self.spin_camera_num.value()
+            self.params.src_signal = self.cb_sensor.isChecked()
+
+        elif curr_idx == 1:  # numpy
+            self.params.src_type = ProcessManager.INPUT_TYPE_NUMPY
+
+            if self.np_video_path is None:
+                QMessageBox.critical(self, "Error", "비디오 파일을 선택하세요.")
+                return False
+            self.params.src_video = self.np_video_path
+
+            if self.cb_reference.isChecked():
+                if self.np_signal_path is None:
+                    QMessageBox.critical(self, "Error", "신호 파일을 선택하세요.")
+                    return False
+                self.params.src_signal = self.np_signal_path
+            else:
+                self.params.src_signal = None
+
+        else:  # video file
+            if self.file_video_path is None:
+                QMessageBox.critical(self, "Error", "비디오 파일을 선택하세요.")
+                return False
+
+            self.params.src_type = ProcessManager.INPUT_TYPE_VIDEO_FILE
+            self.params.src_video = self.file_video_path
+            self.params.src_signal = None
+        self.params.is_changed_source = True
+        return True
+
+    def set_model(self, path):
+        self.model_path = path
+        self.params.src_model = path
+        self.params.is_changed_model = True
         name = os.path.split(path)[-1]
         self.lbl_model_name.setText(name)
-        self.processing_thread.set_model(path)
 
+    # Widget signal events ---------------------------------------------------------------------------------------------
     def on_button_event(self, button):
+        # Start button
         if button == self.b_start:
             if button.text() == "Start":
-                input_type, args = self.get_data_source()
-                if input_type is not None:
-                    self.processing_thread.set_parameters(self)
-                    self.processing_thread.set_camera_source(input_type, args)
-                    self.processing_thread.set_process_mode(self.tab_mode.currentIndex())
-                    # 더 추가
-                    self.processing_thread.start()
-                    self.b_start.setText('Stop')
+                if not self.set_source():
+                    return
+                self.set_parameters()
+                self.on_change_process_mode(None)
+                self.params.is_processing = True
+                self.b_start.setText('Stop')
             else:
                 self.stop_processing()
 
+        # Set parameter button
         elif button == self.b_set_parameter:
-            self.processing_thread.set_parameters(self)
+            self.set_parameters()
 
+        # Load model button
         elif button == self.b_set_model:
             path = QFileDialog.getOpenFileName(self, 'Load model path', '../../../model/detect_roi/', filter='Keras model (*.h5)')[0]
             if path:
-                name = os.path.split(path)[-1]
-                self.lbl_model_name.setText(name)
-                self.processing_thread.set_model(path)
+                self.set_model(path)
 
+        # Show bpm button
         elif button == self.b_show_bpm:
             bpms = []
             for i, cb in enumerate(self.cb_bpms):
                 if cb.isChecked():
                     bpms.append(int(cb.text()))
-            self.processing_thread.show_bpms(bpms)
-
-    def stop_processing(self):
-        self.processing_thread.is_processing = False
-        self.processing_thread.wait()
-        self.b_start.setText('Start')
-
-    def get_data_source(self):
-        curr_idx = self.tab_src.currentIndex()
-        if curr_idx == 0:  # camera
-            camera_num = self.spin_camera_num.value()
-            use_sensor = self.cb_sensor.isChecked()
-            input_type = ProcessingThread.INPUT_TYPE_WEBCAM
-            args = (camera_num, use_sensor)
-
-        elif curr_idx == 1:  # numpy
-            use_sensor = self.cb_reference.isChecked()
-            video_path = self.np_video_path
-            signal_path = self.np_signal_path
-            if video_path is None:
-                QMessageBox.critical(self, "Error", "비디오 파일을 선택하세요.")
-                return None, None
-            if use_sensor:
-                if signal_path is None:
-                    QMessageBox.critical(self, "Error", "신호 파일을 선택하세요.")
-                    return None, None
-            else:
-                signal_path = None
-            input_type = ProcessingThread.INPUT_TYPE_NUMPY
-            args = (video_path, signal_path)
-
-        else:  # video file
-            video_path = self.file_video_path
-            if video_path is None:
-                QMessageBox.critical(self, "Error", "비디오 파일을 선택하세요.")
-                return None, None
-            input_type = ProcessingThread.INPUT_TYPE_VIDEO_FILE
-            args = video_path
-        return input_type, args
+            self.params.bpm_list = bpms
+            self.params.is_show_bpm = True
 
     def on_change_process_mode(self, index):
-        self.processing_thread.set_process_mode(self.tab_mode.currentIndex())
+        self.params.mode_process = self.tab_mode.currentIndex()
 
     def on_change_data_source(self, index):
         self.stop_processing()
@@ -168,14 +196,24 @@ class MainWindow(WindowForm):
 
     def on_click_show_mode(self, button):
         if button == self.b_show_original:
-            self.processing_thread.set_show_mode(self.processing_thread.SHOW_MODE_ORIGIANL)
+            self.params.mode_show = ProcessManager.SHOW_MODE_ORIGIANL
         elif button == self.b_show_resized:
-            self.processing_thread.set_show_mode(self.processing_thread.SHOW_MODE_RESIZED)
+            self.params.mode_show = ProcessManager.SHOW_MODE_RESIZED
         elif button == self.b_show_score:
-            self.processing_thread.set_show_mode(self.processing_thread.SHOW_MODE_SCORE)
+            self.params.mode_show = ProcessManager.SHOW_MODE_SCORE
         elif button == self.b_show_roi:
-            self.processing_thread.set_show_mode(self.processing_thread.SHOW_MODE_ROI)
+            self.params.mode_show = ProcessManager.SHOW_MODE_ROI
 
+    # Custom signal methods --------------------------------------------------------------------------------------------
+    @pyqtSlot(int)
+    def start_processing(self, value):
+        self.progress_bar.setRange(0, value)
+        self.progress_bar.reset()
+
+    @pyqtSlot()
+    def stop_processing(self):
+        self.params.is_processing = False
+        self.b_start.setText('Start')
 
     @pyqtSlot(np.ndarray)
     def show_image(self, frame):
@@ -215,7 +253,7 @@ class MainWindow(WindowForm):
         time = perf_counter()
         self.time_stamp.append(time)
         time_length = len(self.time_stamp)
-        if time_length > self.processing_thread.fps * 1:
+        if time_length > self.params.fps * 1:
             del self.time_stamp[0]
             time_length -= 1
 
@@ -226,17 +264,20 @@ class MainWindow(WindowForm):
             fps = 0.0
         self.lbl_fps.setText('%02d' % round(fps))
 
+    # Event methods ----------------------------------------------------------------------------------------------------
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self.params.is_started = False
         self.stop_processing()
         event.accept()
 
     def keyPressEvent(self, e: QtGui.QKeyEvent) -> None:
         super().keyPressEvent(e)
+
         if e.key() == Qt.Key_1:
-            self.processing_thread.set_show_mode(self.processing_thread.SHOW_MODE_ORIGIANL)
+            self.params.mode_show = ProcessManager.SHOW_MODE_ORIGIANL
         elif e.key() == Qt.Key_2:
-            self.processing_thread.set_show_mode(self.processing_thread.SHOW_MODE_RESIZED)
+            self.params.mode_show = ProcessManager.SHOW_MODE_RESIZED
         elif e.key() == Qt.Key_3:
-            self.processing_thread.set_show_mode(self.processing_thread.SHOW_MODE_SCORE)
+            self.params.mode_show = ProcessManager.SHOW_MODE_SCORE
         elif e.key() == Qt.Key_4:
-            self.processing_thread.set_show_mode(self.processing_thread.SHOW_MODE_ROI)
+            self.params.mode_show = ProcessManager.SHOW_MODE_ROI

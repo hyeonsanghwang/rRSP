@@ -17,6 +17,7 @@ class ClusteringTester:
 
     def process(self, input_data, roi, minimum_signal_num=100):
         # Extract signal from input data
+        input_data = input_data[0]
         signals = input_data.transpose((3, 0, 1, 2))
         signals = signals[..., roi == 1.0].transpose(1, 2, 0)[..., 0]
         signals = signals.T

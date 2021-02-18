@@ -108,9 +108,10 @@ class GDX:
             self.thread.join()
 
             # Sensor close
-            self.gdx.stop()
-            self.gdx.close()
-            self.gdx = None
+            if self.gdx is not None:
+                self.gdx.stop()
+                self.gdx.close()
+                self.gdx = None
 
             # Clear buffers
             self.buffer = []
