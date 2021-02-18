@@ -5,8 +5,8 @@ from methods.motion.data._00_data_preprocess import frame_process
 
 
 class FrameManager:
-    def __init__(self, mutex):
-        self.mutex = mutex
+    def __init__(self, lock):
+        self.mutex = lock
         self.resize_ratio = None
         self.color = None
         self.fps = None
@@ -17,11 +17,13 @@ class FrameManager:
         self.frame = None
         self.processed = None
         self.buffer = None
+        self.frames = None
 
         self.is_available = False
 
     def __clear_buffer(self):
         self.buffer = []
+        self.frames = None
 
     @synchronize
     def set_parameters(self, resize_ratio, color, fps, process_fps, window_size):
@@ -46,23 +48,20 @@ class FrameManager:
     @synchronize
     def set_frame(self, frame):
         if self.is_available:
-            self.frame = frame
-            self.processed = frame_process(frame, self.color, self.resize_ratio)
-
+            self.processed = frame_process(frame, self.color, self.resize_ratio) / 255.0
             self.buffer.append(self.processed)
-            if len(self.buffer) > self.buffer_size:
+
+            if len(self.buffer) < self.buffer_size:
+                return
+            elif len(self.buffer) > self.buffer_size:
                 del self.buffer[0]
+
+            xs = np.array([self.buffer], np.float32)
+            self.frames = xs[:, self.target_index]
         else:
             print("[Frame Manager] Set parameters before calling set_frame")
 
     @synchronize
-    def get_frame(self):
-        if self.is_available:
-            if len(self.buffer) == self.buffer_size:
-                data = (np.array(self.buffer) / 255.0)[self.target_index]
-                return data
-            else:
-                return None
-        else:
-            print("[Frame Manager] Set parameters before calling get_frame")
-            return None
+    def get_frames(self):
+        return self.frames
+

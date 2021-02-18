@@ -21,7 +21,7 @@ class ROIManager:
     @synchronize
     def calculate_roi(self, data, threshold):
         if self.is_available:
-            predict = self.model.predict(np.expand_dims(data, axis=0))[0, ...]
+            predict = self.model.predict(data)[0, ...]
             self.score = predict[..., 0]
             self.roi = (self.score >= threshold).astype(np.float32)
             return self.score, self.roi

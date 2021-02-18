@@ -111,11 +111,13 @@ class ProcessingThread(QThread):
             # Processing
             self.bpm_manager.show_bpms()
             self.frame_manager.set_frame(frame)
-            frames = self.frame_manager.get_frame()
+            frames = self.frame_manager.get_frames()
             signal = None
 
             if frames is not None:
+                # print(frames.shape)
                 score, roi = self.roi_manager.calculate_roi(frames, self.detect_threshold)
+                cv2.imshow('roi', roi)
                 # if roi is not None:
                 #     signal = self.process_clustering.process(frames, roi)
 
