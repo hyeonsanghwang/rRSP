@@ -34,6 +34,10 @@ class Parameters:
         self.mode_process = 0
         self.mode_show = 0
 
+        # Process method's parameter
+        self.process_clustering_show_cluster = False
+        self.process_clustering_show_symmetry_cluster = False
+
         # BPMs
         self.bpm_list = []
 

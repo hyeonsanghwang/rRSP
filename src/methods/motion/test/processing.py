@@ -8,6 +8,8 @@ from methods.motion.test.module_bpm import BPMManager
 from methods.motion.test.module_frame import FrameManager
 from methods.motion.test.module_roi import ROIManager
 from methods.motion.test.process_clustering import ClusteringTester
+from methods.motion.test.process_optical_flow import OpticalflowTester
+
 from resp_utils.resp_signal import SignalStream
 from utils.camera.video_stream import VideoStream
 
@@ -24,6 +26,7 @@ class ProcessManager:
     SHOW_MODE_RESIZED = 1
     SHOW_MODE_SCORE = 2
     SHOW_MODE_ROI = 3
+    SHOW_MODE_OPTICAL = 4
 
     signal_get_image = pyqtSignal(np.ndarray)
     signal_set_fps = pyqtSignal()
@@ -41,11 +44,13 @@ class ProcessManager:
         self.roi_manager = ROIManager(QMutex())
         self.bpm_manager = BPMManager(QMutex())
 
+        # Create processor
+        self.process_clustering = ClusteringTester(self.params)
+        self.process_optical_flow = OpticalflowTester(self.params)
+
         # Initialize parameters
         self.set_parameters()
 
-        # Create processor
-        self.process_clustering = ClusteringTester()
 
     # Main loop --------------------------------------------------------------------------------------------------------
     def start(self):
@@ -77,6 +82,8 @@ class ProcessManager:
                     if roi is not None:
                         if self.params.mode_process == self.PROCESS_MODE_CLUSTER:
                             self.signal = self.process_clustering.process(frames, roi)
+                        elif self.params.mode_process == self.PROCESS_MODE_OPTICAL_FLOW:
+                            self.signal = self.process_optical_flow.process(frame, roi)
 
                 # Show
                 try:
@@ -124,8 +131,9 @@ class ProcessManager:
             self.params.is_changed_parameters = False
 
             self.frame_manager.set_parameters(self.resize_ratio, self.color_domain, self.fps, self.process_fps, self.window_size)
+            self.process_optical_flow.resize_ratio = self.resize_ratio
+            self.process_optical_flow.buffer_size = self.frame_manager.buffer_size
             if self.video_stream is not None:
-                print(self.video_stream)
                 self.video_stream.set(cv2.CAP_PROP_FPS, self.fps)
 
             self.params.signal_dict[self.params.SIGNAL_START_PROCESS].emit(self.frame_manager.buffer_size)
@@ -157,6 +165,10 @@ class ProcessManager:
             elif self.params.mode_show == self.SHOW_MODE_ROI:
                 if self.roi_manager.get_roi() is not None:
                     self.mode_show = self.params.mode_show
+            elif self.params.mode_show == self.SHOW_MODE_OPTICAL:
+                if self.params.mode_process == self.PROCESS_MODE_OPTICAL_FLOW:
+                    if self.process_optical_flow.curr_points is not None:
+                        self.mode_show = self.params.mode_show
             else:
                 self.mode_show = self.params.mode_show
 
@@ -175,6 +187,8 @@ class ProcessManager:
             image = self.roi_manager.get_score()
         elif self.mode_show == self.SHOW_MODE_ROI:
             image = self.roi_manager.get_roi()
+        elif self.mode_show == self.SHOW_MODE_OPTICAL:
+            image = self.process_optical_flow.draw_optical_flow_result()
 
         self.params.signal(self.params.SIGNAL_CHANGED_FRAME).emit(image)
         self.params.signal(self.params.SIGNAL_CHANGED_FPS).emit()
@@ -183,7 +197,7 @@ class ProcessManager:
         if self.signal is None:
             self.params.signal(self.params.SIGNAL_CHANGED_ESTIMATED_SIGNAL).emit(np.zeros((100, )), 0)
         else:
-            self.params.signal(self.params.SIGNAL_CHANGED_ESTIMATED_SIGNAL).emit(self.signal, 0)
+            self.params.signal(self.params.SIGNAL_CHANGED_ESTIMATED_SIGNAL).emit(np.array(self.signal, np.float32), 0)
 
     def show_reference(self):
         if self.signal_stream is not None:
@@ -195,3 +209,5 @@ class ProcessManager:
         key = cv2.waitKey(self.video_stream.delay())
         if key == 27:
             self.bpm_manager.stop()
+            if self.params.mode_process == self.PROCESS_MODE_CLUSTER:
+                self.process_clustering.stop()

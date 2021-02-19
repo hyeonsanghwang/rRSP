@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>970</width>
-    <height>1034</height>
+    <width>986</width>
+    <height>948</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -23,7 +23,7 @@
    <widget class="QLabel" name="lbl_frame">
     <property name="geometry">
      <rect>
-      <x>320</x>
+      <x>10</x>
       <y>50</y>
       <width>640</width>
       <height>480</height>
@@ -39,10 +39,10 @@
    <widget class="QWidget" name="widget_navigate" native="true">
     <property name="geometry">
      <rect>
-      <x>10</x>
+      <x>690</x>
       <y>10</y>
       <width>278</width>
-      <height>847</height>
+      <height>921</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_5">
@@ -75,7 +75,7 @@
           <x>0</x>
           <y>0</y>
           <width>278</width>
-          <height>847</height>
+          <height>921</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_6">
@@ -456,7 +456,7 @@
             </sizepolicy>
            </property>
            <property name="currentIndex">
-            <number>0</number>
+            <number>1</number>
            </property>
            <widget class="QWidget" name="tab_mode_cluster">
             <attribute name="title">
@@ -464,9 +464,23 @@
             </attribute>
             <layout class="QVBoxLayout" name="verticalLayout_4">
              <item>
-              <widget class="QCheckBox" name="checkBox">
+              <widget class="QPushButton" name="b_clustering_flip">
                <property name="text">
-                <string>CheckBox</string>
+                <string>Flip signal</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="b_clustering_show_cluster">
+               <property name="text">
+                <string>Show cluster</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="b_clustering_show_symmetry_cluster">
+               <property name="text">
+                <string>Show symmetry cluster</string>
                </property>
               </widget>
              </item>
@@ -476,6 +490,15 @@
             <attribute name="title">
              <string>Optical flow</string>
             </attribute>
+            <layout class="QVBoxLayout" name="verticalLayout_10">
+             <item>
+              <widget class="QPushButton" name="b_optical_show">
+               <property name="text">
+                <string>Show optical flow</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </widget>
           </widget>
          </item>
@@ -625,7 +648,7 @@
    <widget class="QWidget" name="widget_estimated" native="true">
     <property name="geometry">
      <rect>
-      <x>320</x>
+      <x>10</x>
       <y>560</y>
       <width>640</width>
       <height>150</height>
@@ -745,7 +768,7 @@ color: rgb(0, 255, 0);</string>
    <widget class="QWidget" name="widget_reference" native="true">
     <property name="geometry">
      <rect>
-      <x>320</x>
+      <x>10</x>
       <y>720</y>
       <width>640</width>
       <height>150</height>
@@ -862,7 +885,7 @@ color: rgb(0, 255, 0);</string>
    <widget class="QProgressBar" name="progress_bar">
     <property name="geometry">
      <rect>
-      <x>320</x>
+      <x>10</x>
       <y>530</y>
       <width>640</width>
       <height>20</height>
@@ -878,7 +901,7 @@ color: rgb(0, 255, 0);</string>
    <widget class="QWidget" name="widget_status" native="true">
     <property name="geometry">
      <rect>
-      <x>320</x>
+      <x>10</x>
       <y>10</y>
       <width>640</width>
       <height>30</height>
@@ -923,13 +946,6 @@ color: rgb(0, 255, 0);</string>
         </size>
        </property>
       </spacer>
-     </item>
-     <item>
-      <widget class="QLabel" name="lbl_show_mode">
-       <property name="text">
-        <string>Original</string>
-       </property>
-      </widget>
      </item>
     </layout>
    </widget>

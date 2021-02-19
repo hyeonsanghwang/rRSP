@@ -30,6 +30,7 @@ class MainWindow(WindowForm):
         self.np_signal_path = None
         self.file_video_path = None
         self.time_stamp = []
+        self.clutering_flip = False
 
         # Processing thread
         self.set_signals()
@@ -57,6 +58,12 @@ class MainWindow(WindowForm):
         self.cb_sensor.clicked.connect(lambda: self.on_click_show_signal(self.cb_sensor))
         self.cb_reference.clicked.connect(lambda: self.on_click_show_signal(self.cb_reference))
 
+        # Processing method's events
+        self.b_clustering_flip.clicked.connect(lambda: self.on_click_clutering_options(self.b_clustering_flip))
+        self.b_clustering_show_cluster.clicked.connect(lambda: self.on_click_clutering_options(self.b_clustering_show_cluster))
+        self.b_clustering_show_symmetry_cluster.clicked.connect(lambda: self.on_click_clutering_options(self.b_clustering_show_symmetry_cluster))
+        self.b_optical_show.clicked.connect(lambda: self.on_click_optical_flow_options(self.b_optical_show))
+
         # Set default model path
         self.set_model('../../../model/detect_roi/model.h5')
 
@@ -65,8 +72,8 @@ class MainWindow(WindowForm):
         self.signal_start_process.connect(self.start_processing)
         self.signal_stop_process.connect(self.stop_processing)
         self.signal_changed_frame.connect(self.show_image)
-        self.signal_changed_estimated_signal.connect(self.show_reference_signal)
-        self.signal_changed_reference_signal.connect(self.show_reference_signal)
+        self.signal_changed_estimated_signal.connect(self.show_signal)
+        self.signal_changed_reference_signal.connect(self.show_signal)
         self.signal_changed_fps.connect(self.set_fps)
 
         self.params.set_signal(self.params.SIGNAL_START_PROCESS, self.signal_start_process)
@@ -204,6 +211,18 @@ class MainWindow(WindowForm):
         elif button == self.b_show_roi:
             self.params.mode_show = ProcessManager.SHOW_MODE_ROI
 
+    def on_click_clutering_options(self, button):
+        if button == self.b_clustering_flip:
+            self.clutering_flip = not self.clutering_flip
+        elif button == self.b_clustering_show_cluster:
+            self.params.process_clustering_show_cluster = True
+        elif button == self.b_clustering_show_symmetry_cluster:
+            self.params.process_clustering_show_symmetry_cluster = True
+
+    def on_click_optical_flow_options(self, button):
+        if button == self.b_optical_show:
+            self.params.mode_show = ProcessManager.SHOW_MODE_OPTICAL
+
     # Custom signal methods --------------------------------------------------------------------------------------------
     @pyqtSlot(int)
     def start_processing(self, value):
@@ -235,15 +254,18 @@ class MainWindow(WindowForm):
         self.progress_bar.setValue(val+1)
 
     @pyqtSlot(np.ndarray, int)
-    def show_reference_signal(self, signal, target):
+    def show_signal(self, signal, target):
+        flip = False
         if target == 0:
+            if self.params.mode_process == ProcessManager.PROCESS_MODE_CLUSTER and self.clutering_flip:
+                flip = True
             widget = self.lbl_signal_estimated
         else:
             widget = self.lbl_signal_reference
         w = widget.width()
         h = widget.height()
 
-        frame = signal_to_frame(signal, width=w, height=h, foreground=(0, 255, 0))
+        frame = signal_to_frame(signal, width=w, height=h, foreground=(0, 255, 0), flip=flip)
         image = QtGui.QImage(frame, frame.shape[1], frame.shape[0], frame.shape[1] * 3, QtGui.QImage.Format_BGR888)
         pixmap = QtGui.QPixmap(image)
         widget.setPixmap(pixmap)
@@ -281,3 +303,5 @@ class MainWindow(WindowForm):
             self.params.mode_show = ProcessManager.SHOW_MODE_SCORE
         elif e.key() == Qt.Key_4:
             self.params.mode_show = ProcessManager.SHOW_MODE_ROI
+        elif e.key() == Qt.Key_5:
+            self.params.mode_show = ProcessManager.SHOW_MODE_OPTICAL
