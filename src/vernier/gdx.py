@@ -249,7 +249,7 @@ class gdx:
         # First check to make sure there are devices connected.  
         if not gdx.devices:
             print("start() - no device connected")
-            return 
+            return False
 
         # If the period argument is left blank provide an input prompt for the user to enter the period.
         if period == None: 
@@ -268,7 +268,7 @@ class gdx:
             print("start device ", i, sep="")
             gdx.devices[i].start(period=period)
             i +=1            
-
+        return True
 
     
     def read(self):             

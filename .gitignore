@@ -1,5 +1,6 @@
 */.idea/*
 .idea/*
+model/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -40,7 +41,7 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
+# Unit gui2 / coverage reports
 htmlcov/
 .tox/
 .nox/

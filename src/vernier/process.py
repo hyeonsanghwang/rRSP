@@ -21,6 +21,7 @@ class GDX:
 
         self.thread = None
         self.gdx = None
+        self.is_connected = False
 
         self.init_variables()
 
@@ -42,35 +43,44 @@ class GDX:
             self.gdx.open_ble()
 
         self.gdx.select_sensors()
-        self.gdx.start(period=10)
-
-        self.thread = threading.Thread(target=self._start)
-        self.thread.start()
+        ret = self.gdx.start(period=10)
+        if ret:
+            self.thread = threading.Thread(target=self._start)
+            self.thread.start()
+            self.is_connected = True
+        else:
+            print('No device connected')
 
     def _start(self):
         while self.is_started:
-            self.time_stamp.append(perf_counter())
-            val, bpm = self.gdx.read()
-            self.bpm = self.bpm if np.isnan(bpm) else bpm
-            self.buffer.append(val)
+            try:
+                self.time_stamp.append(perf_counter())
+                val, bpm = self.gdx.read()
+                self.bpm = self.bpm if np.isnan(bpm) else bpm
+                self.buffer.append(val)
 
-            if len(self.buffer) > self.BUFFER_SIZE:
-                del self.buffer[0]
-                del self.time_stamp[0]
+                if len(self.buffer) > self.BUFFER_SIZE:
+                    del self.buffer[0]
+                    del self.time_stamp[0]
 
-            if self.is_show:
-                start_index = self._get_start_index()
-                window_fps = self._get_window_fps()
-                signal = self.buffer[start_index: ]
+                if self.is_show:
+                    start_index = self._get_start_index()
+                    window_fps = self._get_window_fps()
+                    signal = self.buffer[start_index: ]
 
-                frame = signal_to_frame(signal, width=self.frame_width, height=self.frame_height)
-                cv2.putText(frame, '%02d fps' % round(window_fps), (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-                cv2.putText(frame, '%02d bpm' % self.bpm, (self.frame_width - 70, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-                cv2.imshow('Vernier GDX signal', frame)
+                    if len(signal) > 1:
+                        frame = signal_to_frame(signal, width=self.frame_width, height=self.frame_height)
+                        cv2.putText(frame, '%02d fps' % round(window_fps), (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                        cv2.putText(frame, '%02d bpm' % self.bpm, (self.frame_width - 70, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                        cv2.imshow('Vernier GDX signal', frame)
 
-                key = cv2.waitKey(1)
-                if key == 27:
-                    self.is_started = False
+                        key = cv2.waitKey(1)
+                        if key == 27:
+                            self.is_started = False
+            except:
+                print('Respiration sensor is not connect')
+                self.is_started = False
+                break
 
     def _get_start_index(self):
         if self.window_period is None:
